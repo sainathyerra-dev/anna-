@@ -11,7 +11,7 @@ npm ci
 Copy-Item .env.example .env
 ```
 
-Edit `.env` locally and enter your Anthropic API key. Then run `npm start` and open http://localhost:3000. Keep the terminal running. No real AI replies are possible without an API key and API billing. Local mode binds to 127.0.0.1, so it is accessible only on this computer.
+Edit `.env` locally and enter your OpenAI API key. Then run `npm start` and open http://localhost:3000. Keep the terminal running. No real AI replies are possible without an API key and API billing. Local mode binds to 127.0.0.1, so it is accessible only on this computer.
 
 ## Existing free Render service
 
@@ -20,7 +20,7 @@ Use your existing GitHub repository and Render service; no paid upgrade is neede
 1. Set Render build command to `npm ci` and start command to `npm start`.
 2. Set `NODE_ENV=production` and `STORAGE_MODE=browser`.
 3. Set `APP_PASSWORD` to your own strong password, at least 16 characters. Enter it directly in Render, never in the repository or a chat.
-4. Set `ANTHROPIC_API_KEY` directly in Render. It must be a real key, not an environment name. Do not publish it.
+4. Set `OPENAI_API_KEY` directly in Render. Create your key at https://platform.openai.com/api-keys. It must be a real key, not an environment name. Do not publish it. API billing is separate from ChatGPT subscriptions. The default model is `gpt-5.4-mini`; optionally set `OPENAI_MODEL` to a compatible model your project can access.
 5. Use `/health` for Render's health check.
 6. Upload the corrected source files to the existing repository, preserving the `public/` and `test/` directories. Exclude `.env`, `node_modules/`, and `data/`. Deploy the corrected commit.
 7. Visit your HTTPS Render URL and sign in with your Anna password.
@@ -33,7 +33,7 @@ Free services can sleep, so the first page load after inactivity may take time. 
 - Use **Export backup** regularly. **Restore backup** replaces the current device's conversation and habit ledger from a valid JSON backup. Export first if you want to preserve the current data. Exported backups contain plaintext conversations.
 - In `STORAGE_MODE=file`, data lives in `data/db.json` or `DATA_DIR/db.json`. Saves are atomic with one previous-version `.bak` file. Corrupt data stops startup instead of silently erasing history.
 - For hosted file storage, attach a persistent disk and set `DATA_DIR` to its mounted directory. This requires a paid Render service. Never use temporary hosting storage for durable chat history.
-- The most recent conversation context is sent to Anthropic for each reply; it is not limited to your device. Very long conversations keep the full saved transcript, but Anna sees only a bounded recent portion, and the UI tells you when context is shortened. There is no permanent AI memory or automatic summary in this version.
+- The most recent conversation context is sent to OpenAI for each reply; it is not limited to your device. Requests use the Responses API with `store: false`, disabling response-object storage for later retrieval; this does not mean zero provider retention. Very long conversations keep the full saved transcript, but Anna sees only a bounded recent portion, and the UI tells you when context is shortened. There is no permanent AI memory or automatic summary in this version. Existing device conversations and backups remain compatible after switching providers.
 - Clearing a conversation preserves habits. Failed requests appear as errors, not fake assistant messages. Retry sends the existing unanswered message rather than duplicating it.
 
 ## Phone app experience
@@ -47,3 +47,5 @@ Run `npm test`. The tests use mocked provider replies; they never spend API cred
 This is a personal app, not a multi-user messenger. Rate limits are deliberately shared by this single-user server. Sessions last seven days; changing APP_PASSWORD invalidates prior sessions. Use a fresh private password if you need to revoke all sessions. Provider usage is billed separately from hosting and consumer AI subscriptions.
 
 Hosting documentation: https://render.com/docs/free and https://render.com/docs/web-services
+
+OpenAI implementation references: https://developers.openai.com/api/docs/guides/text and https://developers.openai.com/api/docs/models/gpt-5.4-mini

@@ -82,7 +82,7 @@ async function loadInitialState() {
     if(!validSaved(data)) throw Error('Saved data is invalid. Restore your backup before continuing.');
     messages=data.messages;ledgerByDate=data.ledger;revision=data.revision;configured=data.configured;
     ready=true;dirty=false;conflicted=false;$('loginPanel').hidden=true;$('logoutBtn').hidden=!data.privateLogin;$('reloadBtn').hidden=true;
-    renderMessages();renderLedger();error(configured?'':'Add your Anthropic API key to .env, then restart Anna to enable replies.');
+    renderMessages();renderLedger();error(configured?'':'Add your OpenAI API key to the server settings, then restart Anna to enable replies.');
     $('storageNote').textContent=storageMode==='browser'?'History is saved in this browser only. Export backups; devices have separate chats.':'History is saved on your Anna server. Export backups regularly.';
   } catch(e) {error(e.message);$('reloadBtn').hidden=false;}
   controls();
@@ -106,7 +106,7 @@ async function reply() {
 async function handleSend() {
   if(!ready||busy||conflicted||!configured)return;
   const text=$('text-input').value.trim();if(!text)return;
-  if(messages.at(-1)?.role==='user') {error('Retry the unanswered message, or clear the conversation before sending another.');return;}
+    if(messages.at(-1)?.role==='user') {error('Retry the unanswered message, or clear the conversation before sending another.');return;}
   if(text.length>16000){error('Please keep each message under 16,000 characters.');return;}
   busy=true;controls();error();
   messages.push({role:'user',content:text,ts:Date.now()});$('text-input').value='';$('text-input').style.height='auto';renderMessages();
@@ -125,7 +125,7 @@ $('ledger').addEventListener('click',async e=>{
 $('retryBtn').addEventListener('click',async()=>{
   if(!ready||busy||conflicted)return;
   busy=true;controls();error();
-  try{if(dirty)await persistState();if(messages.at(-1)?.role==='user'){if(!configured)throw Error('Configure your Anthropic API key first.');await reply();}}
+  try{if(dirty)await persistState();if(messages.at(-1)?.role==='user'){if(!configured)throw Error('Configure your OpenAI API key first.');await reply();}}
   catch(e){error(e.name==='AbortError'?'Reply cancelled. Retry when ready.':e.message);}finally{busy=false;controls();}
 });
 $('cancelBtn').addEventListener('click',()=>controller?.abort());

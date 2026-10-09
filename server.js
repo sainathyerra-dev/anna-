@@ -15,7 +15,7 @@ function createApp(options = {}) {
   const production = options.production ?? process.env.NODE_ENV === 'production';
   const password = options.password ?? process.env.APP_PASSWORD ?? '';
   if (production && password.length < 16) throw Error('Set APP_PASSWORD to at least 16 characters before hosting.');
-  const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
+  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
   const providerFetch = options.fetch ?? global.fetch;
   const storageMode=options.storageMode ?? process.env.STORAGE_MODE ?? 'file';
   if (!['file','browser'].includes(storageMode)) throw Error('STORAGE_MODE must be file or browser.');
@@ -76,7 +76,7 @@ function createApp(options = {}) {
   });
   app.use('/api',(req,res,next)=>authenticated(req)?next():res.status(401).json({error:'Sign in to Anna.'}));
   app.post('/api/logout',(req,res)=>{res.set('Set-Cookie',`anna_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${production?'; Secure':''}`);res.json({ok:true});});
-  app.get('/api/state',(req,res)=>res.json({...state,storageMode,configured:!!apiKey && apiKey!=='sk-ant-your-key-here',privateLogin:!!password}));
+  app.get('/api/state',(req,res)=>res.json({...state,storageMode,configured:!!apiKey && apiKey!=='sk-your-openai-key-here',privateLogin:!!password}));
   app.post('/api/state',(req,res)=>{
     if(storageMode==='browser') return res.status(405).json({error:'This Anna stores history on your device, not on the hosting server.'});
     if (!validState(req.body)) return res.status(400).json({error:'Invalid conversation or habit data.'});
@@ -86,7 +86,7 @@ function createApp(options = {}) {
   });
   let active=false, chatWindow=0, chatCount=0;
   app.post('/api/chat',async(req,res)=>{
-    if (!apiKey || apiKey==='sk-ant-your-key-here') return res.status(503).json({error:'Add your Anthropic API key to the server settings, then restart Anna.'});
+    if (!apiKey || apiKey==='sk-your-openai-key-here') return res.status(503).json({error:'Add your OpenAI API key to the server settings, then restart Anna.'});
     const messages=req.body?.messages;
     if (!Array.isArray(messages) || !messages.length || messages.length>100 || !messages.every(m=>m && ['user','assistant'].includes(m.role) && typeof m.content==='string' && m.content.trim() && m.content.length<=16000) || messages[0].role!=='user' || messages.at(-1).role!=='user' || JSON.stringify(messages).length>32000) return res.status(400).json({error:'Conversation request is invalid or too long.'});
     if (active) return res.status(429).json({error:'Anna is already replying. Wait, then retry.'});
@@ -98,10 +98,14 @@ function createApp(options = {}) {
     const abort=()=>{if (!res.writableEnded) controller.abort();};
     res.on('close',abort);
     try {
-      const response=await providerFetch('https://api.anthropic.com/v1/messages',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:process.env.ANTHROPIC_MODEL||'claude-sonnet-4-6',max_tokens:1000,system:SYSTEM_PROMPT,messages})});
-      if (!response.ok) {await response.text(); return res.status(502).json({error:response.status===401?'The Anthropic API key was rejected. Check the server settings.':response.status===429?'Anthropic is busy or your API limit was reached. Try again later.':'Anthropic could not answer. Check API billing and model access, then retry.'});}
+      const response=await providerFetch('https://api.openai.com/v1/responses',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},body:JSON.stringify({model:process.env.OPENAI_MODEL||'gpt-5.4-mini',max_output_tokens:1000,instructions:SYSTEM_PROMPT,input:messages,store:false})});
+      if (!response.ok) {
+        const providerError=await response.json().catch(()=>({}));
+        const error=response.status===401?'The OpenAI API key was rejected. Check the server settings.':response.status===429?(providerError.error?.code==='insufficient_quota'?'Your OpenAI API credits or spending limit were reached. Check API billing, then retry.':'OpenAI is busy or your API rate limit was reached. Try again later.'):[403,404].includes(response.status)?'The OpenAI model is unavailable for this API project. Check model access and server settings.':'OpenAI could not answer. Check API billing and model access, then retry.';
+        return res.status(502).json({error});
+      }
       const data=await response.json();
-      const reply=(data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+      const reply=(data.output||[]).filter(item=>item.type==='message' && item.role==='assistant').flatMap(item=>item.content||[]).map(block=>block.type==='output_text'?block.text:block.type==='refusal'?block.refusal:'').filter(text=>typeof text==='string').join('\n').trim();
       if (!reply || reply.length>16000) return res.status(502).json({error:'Anna returned an unusable reply. Please retry.'});
       res.json({reply});
     } catch {if (!res.destroyed) res.status(504).json({error:'Anna could not connect or took too long. Please retry.'});}
@@ -115,6 +119,6 @@ if (require.main===module) {
   const production=process.env.NODE_ENV==='production';
   const host=production?'0.0.0.0':'127.0.0.1';
   const port=process.env.PORT||3000;
-  createApp().listen(port,host,()=>console.log(`Anna is running at http://localhost:${port}${process.env.ANTHROPIC_API_KEY?'':' — API key still needed for replies'}`));
+  createApp().listen(port,host,()=>console.log(`Anna is running at http://localhost:${port}${process.env.OPENAI_API_KEY?'':' — OpenAI API key still needed for replies'}`));
 }
 module.exports={createApp,validState};
