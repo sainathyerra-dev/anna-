@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B2430">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Anna</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -33,6 +38,7 @@
     width:100%;
     max-width: 560px;
     height:100vh;
+    height:100dvh;
     display:flex;
     flex-direction:column;
     background: linear-gradient(180deg, var(--ink) 0%, var(--ink-2) 100%);
@@ -70,7 +76,8 @@
     background: rgba(184,137,43,0.04);
     transition: background 0.15s ease, border-color 0.15s ease;
     user-select:none;
-    height:14px;
+    min-height:44px;
+    color:var(--paper); font:inherit; font-size:12px;
   }
   .ledger-item:hover{ background: rgba(184,137,43,0.09); }
   .ledger-item.done{
@@ -179,10 +186,29 @@
     text-align:center;
     padding: 3px 0 0;
   }
+[hidden]{display:none!important;}
+  button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--brass-light);outline-offset:2px;}
+  .bubble{white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;}
+  .msg>div:last-child{min-width:0;}
+  #text-input{min-width:0;}
+  .toolbar{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding:8px 12px;}
+  .toolbar button{background:none;border:0;color:var(--slate);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer;min-height:32px;}
+  .toolbar button:disabled{opacity:.4;cursor:default;}
+  .conn-error{color:#ffd1bf;font-size:12px;line-height:1.5;padding:8px 16px;}
+  #loginPanel{position:absolute;inset:0;z-index:2;background:var(--ink);display:grid;place-items:center;padding:24px;}
+  #loginForm{display:grid;gap:14px;width:100%;max-width:320px;}
+  #loginForm input,#loginForm button{font:inherit;padding:12px;border-radius:8px;border:1px solid var(--brass);}
+  #loginForm button{background:var(--brass);cursor:pointer;}
+  #contextNote,#typingNote,.privacy-note{text-align:center;font-size:11px;color:var(--slate);padding:4px 12px;}
+  .privacy-note{padding-bottom:max(8px,env(safe-area-inset-bottom));}
+  #chat{min-height:0;}
+  #exportBtn{min-height:32px;}
+  #connError{position:relative;z-index:3;}
 </style>
 </head>
 <body>
 <div id="app">
+  <section id="loginPanel" hidden aria-label="Private sign in"><form id="loginForm"><h1>Anna</h1><p>Your private conversation space.</p><label for="password">Your Anna password</label><input id="password" type="password" autocomplete="current-password" required><button id="loginBtn" type="submit">Sign in</button></form></section>
   <header>
     <div class="header-row">
       <div class="seal">A</div>
@@ -192,242 +218,32 @@
       </div>
     </div>
     <div class="ledger" id="ledger">
-      <div class="ledger-item" data-key="swim" title="Swim"></div>
-      <div class="ledger-item" data-key="temple" title="Temple"></div>
-      <div class="ledger-item" data-key="water" title="Water"></div>
-      <div class="ledger-item" data-key="parents" title="Parents call"></div>
-      <div class="ledger-item" data-key="study" title="Study"></div>
-      <div class="ledger-item" data-key="market" title="Market"></div>
-      <div class="ledger-item" data-key="laundry" title="Laundry"></div>
-      <div class="ledger-item" data-key="room" title="Room"></div>
+      <button class="ledger-item" type="button" data-key="swim" aria-pressed="false">Swim</button>
+      <button class="ledger-item" type="button" data-key="temple" aria-pressed="false">Prayer</button>
+      <button class="ledger-item" type="button" data-key="water" aria-pressed="false">Water</button>
+      <button class="ledger-item" type="button" data-key="parents" aria-pressed="false">Parents</button>
+      <button class="ledger-item" type="button" data-key="study" aria-pressed="false">Study</button>
+      <button class="ledger-item" type="button" data-key="market" aria-pressed="false">Market</button>
+      <button class="ledger-item" type="button" data-key="laundry" aria-pressed="false">Laundry</button>
+      <button class="ledger-item" type="button" data-key="room" aria-pressed="false">Room</button>
     </div>
     <div class="streak-note" id="streakNote">streak: 0 days</div>
   </header>
 
-  <div id="chat"></div>
+  <div id="chat" role="log" aria-label="Conversation" aria-live="polite"></div>
+  <div id="typingNote" role="status" hidden>Anna is replying…</div>
+  <div id="contextNote" hidden>Anna sees the most recent part of this conversation. Older messages remain saved.</div>
 
   <div id="input-row">
-    <textarea id="text-input" rows="1" placeholder="Talk to Anna..."></textarea>
+    <textarea id="text-input" rows="1" placeholder="Talk to Anna..." aria-label="Message Anna" maxlength="16000"></textarea>
     <button id="send-btn">Send</button>
   </div>
-  <div class="reset-link" id="resetLink">clear conversation history</div>
-  <div class="conn-error" id="connError" style="display:none;">Can't reach the server — is it running?</div>
+  <div class="toolbar"><button id="retryBtn" hidden>Retry / save again</button><button id="cancelBtn" hidden>Cancel reply</button><button id="reloadBtn" hidden>Reload saved data</button><button id="resetLink">Clear conversation</button><button id="exportBtn">Export backup</button><button id="importBtn">Restore backup</button><button id="logoutBtn" hidden>Sign out</button></div>
+  <input id="importFile" type="file" accept="application/json,.json" hidden>
+  <div class="conn-error" id="connError" role="alert" hidden></div>
+  <div class="privacy-note">AI companion · Messages you send go to Anthropic for replies.</div>
+  <div class="privacy-note" id="storageNote"></div>
 </div>
-
-<script>
-let messages = [];
-let ledgerByDate = {};
-let currentDate = new Date().toISOString().slice(0,10);
-
-const chatEl = document.getElementById('chat');
-const inputEl = document.getElementById('text-input');
-const sendBtn = document.getElementById('send-btn');
-const ledgerEl = document.getElementById('ledger');
-const streakNoteEl = document.getElementById('streakNote');
-const resetLink = document.getElementById('resetLink');
-const connErrorEl = document.getElementById('connError');
-
-function fmtTime(ts){
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-}
-
-function renderMessages(){
-  chatEl.innerHTML = '';
-  messages.forEach(m => {
-    const row = document.createElement('div');
-    row.className = 'msg ' + (m.role === 'user' ? 'user' : 'anna');
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar-sm';
-    avatar.textContent = m.role === 'user' ? 'S' : 'A';
-    const wrap = document.createElement('div');
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = m.content;
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    meta.textContent = fmtTime(m.ts);
-    wrap.appendChild(bubble);
-    wrap.appendChild(meta);
-    row.appendChild(avatar);
-    row.appendChild(wrap);
-    chatEl.appendChild(row);
-  });
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
-
-function showTyping(){
-  const row = document.createElement('div');
-  row.className = 'msg anna';
-  row.id = 'typingRow';
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar-sm';
-  avatar.textContent = 'A';
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble typing';
-  bubble.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
-  row.appendChild(avatar);
-  row.appendChild(bubble);
-  chatEl.appendChild(row);
-  chatEl.scrollTop = chatEl.scrollHeight;
-}
-function removeTyping(){
-  const el = document.getElementById('typingRow');
-  if(el) el.remove();
-}
-
-async function persistState(){
-  try{
-    await fetch('/api/state', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, ledger: ledgerByDate })
-    });
-    connErrorEl.style.display = 'none';
-  }catch(e){
-    console.error('persist failed', e);
-    connErrorEl.style.display = 'block';
-  }
-}
-
-function computeStreak(){
-  let streak = 0;
-  let d = new Date();
-  for(let i=0;i<60;i++){
-    const key = d.toISOString().slice(0,10);
-    const entry = ledgerByDate[key];
-    const any = entry && Object.values(entry).some(v => v);
-    if(any){ streak++; }
-    else if(i===0){ /* today with nothing yet — don't break streak */ }
-    else break;
-    d.setDate(d.getDate()-1);
-  }
-  streakNoteEl.textContent = 'streak: ' + streak + ' day' + (streak===1?'':'s');
-}
-
-function renderLedger(){
-  const today = ledgerByDate[currentDate] || {};
-  Array.from(ledgerEl.children).forEach(item => {
-    const key = item.getAttribute('data-key');
-    if(today[key]) item.classList.add('done');
-    else item.classList.remove('done');
-  });
-}
-
-ledgerEl.addEventListener('click', async (e) => {
-  const item = e.target.closest('.ledger-item');
-  if(!item) return;
-  const key = item.getAttribute('data-key');
-  if(!ledgerByDate[currentDate]) ledgerByDate[currentDate] = {};
-  ledgerByDate[currentDate][key] = !ledgerByDate[currentDate][key];
-  renderLedger();
-  computeStreak();
-  await persistState();
-});
-
-async function loadInitialState(){
-  try{
-    const res = await fetch('/api/state');
-    const data = await res.json();
-    messages = data.messages || [];
-    ledgerByDate = data.ledger || {};
-    connErrorEl.style.display = 'none';
-  }catch(e){
-    console.error('load failed', e);
-    connErrorEl.style.display = 'block';
-    messages = [];
-    ledgerByDate = {};
-  }
-
-  renderMessages();
-  renderLedger();
-  computeStreak();
-
-  if(messages.length === 0){
-    await sendAnnaOpening();
-  }
-}
-
-async function callAnna(){
-  const apiMessages = messages.map(m => ({ role: m.role, content: m.content }));
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: apiMessages })
-  });
-  if(!response.ok){
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || 'Chat request failed');
-  }
-  const data = await response.json();
-  return data.reply;
-}
-
-async function sendAnnaOpening(){
-  showTyping();
-  try{
-    const reply = await callAnna();
-    removeTyping();
-    messages.push({ role:'assistant', content: reply || "Em ra, ela unnav ivala?", ts: Date.now() });
-    renderMessages();
-    await persistState();
-  }catch(e){
-    removeTyping();
-    connErrorEl.style.display = 'block';
-    messages.push({ role:'assistant', content:"Connection hiccup on my end — check the server's running, then say hi again.", ts: Date.now() });
-    renderMessages();
-  }
-}
-
-async function handleSend(){
-  const text = inputEl.value.trim();
-  if(!text) return;
-  inputEl.value = '';
-  inputEl.style.height = 'auto';
-  sendBtn.disabled = true;
-
-  messages.push({ role:'user', content:text, ts: Date.now() });
-  renderMessages();
-  await persistState();
-
-  showTyping();
-  try{
-    const reply = await callAnna();
-    removeTyping();
-    messages.push({ role:'assistant', content: reply || "Cheppu ra.", ts: Date.now() });
-    renderMessages();
-    await persistState();
-  }catch(e){
-    removeTyping();
-    connErrorEl.style.display = 'block';
-    messages.push({ role:'assistant', content:"Connection hiccup on my end — say that again?", ts: Date.now() });
-    renderMessages();
-  }
-  sendBtn.disabled = false;
-  inputEl.focus();
-}
-
-sendBtn.addEventListener('click', handleSend);
-inputEl.addEventListener('keydown', (e) => {
-  if(e.key === 'Enter' && !e.shiftKey){
-    e.preventDefault();
-    handleSend();
-  }
-});
-inputEl.addEventListener('input', () => {
-  inputEl.style.height = 'auto';
-  inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px';
-});
-
-resetLink.addEventListener('click', async () => {
-  if(!confirm('Clear all conversation history with Anna? This cannot be undone.')) return;
-  messages = [];
-  await persistState();
-  renderMessages();
-  await sendAnnaOpening();
-});
-
-loadInitialState();
-</script>
+<script src="/app.js" defer></script>
 </body>
 </html>
