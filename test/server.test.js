@@ -67,7 +67,7 @@ test('missing API key gives a useful configuration error',async t=>{
 });
 test('mocked provider replies work; concurrent and oversized requests are rejected',async t=>{
   let release,started;const entered=new Promise(r=>started=r);const wait=new Promise(r=>release=r);
-  const f=await fixture(t,{apiKey:'test-key',fetch:async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.messages[0].content,'hello');started();await wait;return {ok:true,json:async()=>({content:[{type:'text',text:'Hi there'}]})};}});
+  const f=await fixture(t,{apiKey:'test-key',fetch:async(url,options)=>{const body=JSON.parse(options.body);assert.equal(url,'https://api.openai.com/v1/responses');assert.equal(body.input[0].content,'hello');assert.equal(body.store,false);assert.ok(body.instructions.includes('You are Anna'));assert.equal(options.headers.Authorization,'Bearer test-key');started();await wait;return {ok:true,json:async()=>({output:[{type:'reasoning',summary:[]},{type:'message',role:'assistant',content:[{type:'output_text',text:'Hi there'}]}]})};}});
   const payload={messages:[{role:'user',content:'hello'}]};
   const first=f.call('/api/chat',payload);await entered;
   assert.equal((await f.call('/api/chat',payload)).status,429);release();
@@ -76,9 +76,17 @@ test('mocked provider replies work; concurrent and oversized requests are reject
   assert.equal((await f.call('/api/chat',{messages:[{role:'user',content:'x'.repeat(16001)}]})).status,400);
 });
 test('upstream failures are separate errors without provider payload leakage',async t=>{
-  const f=await fixture(t,{apiKey:'test-key',fetch:async()=>({ok:false,status:401,text:async()=> 'provider secret details'})});
+  const f=await fixture(t,{apiKey:'test-key',fetch:async()=>({ok:false,status:401,json:async()=> ({error:{message:'provider secret details'}})})});
   const res=await f.call('/api/chat',{messages:[{role:'user',content:'hello'}]});assert.equal(res.status,502);
   const text=await res.text();assert.match(text,/key was rejected/);assert.doesNotMatch(text,/secret details/);
+});
+test('OpenAI quota errors explain separate API billing',async t=>{
+  const f=await fixture(t,{apiKey:'test-key',fetch:async()=>({ok:false,status:429,json:async()=>({error:{code:'insufficient_quota'}})})});
+  const response=await f.call('/api/chat',{messages:[{role:'user',content:'hello'}]});assert.equal(response.status,502);assert.match((await response.json()).error,/API credits/);
+});
+test('OpenAI refusal blocks produce the actual model response',async t=>{
+  const f=await fixture(t,{apiKey:'test-key',fetch:async()=>({ok:true,json:async()=>({output:[{type:'message',role:'assistant',content:[{type:'refusal',refusal:'I cannot help with that request.'}]}]})})});
+  const response=await f.call('/api/chat',{messages:[{role:'user',content:'hello'}]});assert.equal((await response.json()).reply,'I cannot help with that request.');
 });
 test('login throttles repeated attempts',async t=>{
   const f=await fixture(t,{password:'a-long-test-password'});
